@@ -1,0 +1,237 @@
+================================================================================
+  NAVEGACIÓN DEL PROYECTO: CONVERTIDOR JPG
+================================================================================
+
+DESCRIPCIÓN GENERAL:
+Este es un proyecto Node.js que convierte imágenes de múltiples formatos a JPG.
+Soporta conversión con reanudación, checkpoints, y mantenimiento de estructura
+de carpetas.
+
+================================================================================
+ESTRUCTURA DE CARPETAS:
+================================================================================
+
+📁 001convertir-jpg/ (Raíz del proyecto)
+│
+├── 📄 convertidor.mjs           ← Script principal (módulo ES6)
+├── 📄 package.json              ← Configuración del proyecto y dependencias
+├── 📄 NAVEGACION.txt            ← Este archivo
+│
+├── 📁 img/                       ← CARPETA DE ENTRADA (Imágenes originales)
+│   │                               Coloca aquí las imágenes a convertir
+│   │                               Soportados: PNG, JPG, JPEG, JFIF, WebP,
+│   │                               AVIF, HEIC, HEIF, TIFF, BMP, GIF, SVG
+│   └── [subcarpetas y archivos de imagen]
+│
+├── 📁 jpgs/                      ← CARPETA DE SALIDA (Imágenes convertidas)
+│   │                               Aquí se guardan los JPGs convertidos
+│   │                               Mantiene la estructura de subcarpetas
+│   ├── .convert-jpg-state.json  ← Archivo de estado (para reanudación)
+│   ├── .convert-events.jsonl    ← Log de eventos (cada línea = evento JSON)
+│   ├── convert-summary-[timestamp].txt ← Resumen final de la conversión
+│   └── [subcarpetas y archivos JPG]
+│
+├── 📁 node_modules/             ← Dependencias instaladas (npm install)
+│   ├── globby/                  ← Búsqueda de archivos con patrones
+│   ├── p-limit/                 ← Control de concurrencia paralela
+│   ├── sharp/                   ← Procesamiento de imágenes
+│   └── [otras dependencias...]
+│
+└── 📄 package-lock.json         ← Bloqueo de versiones de dependencias
+
+================================================================================
+CÓMO FUNCIONA:
+================================================================================
+
+1. CONFIGURACIÓN (convertidor.mjs - líneas 6-19):
+   - INPUT_DIR: "./img"        → Carpeta de entrada
+   - OUTPUT_DIR: "./jpgs"      → Carpeta de salida
+   - QUALITY: 82               → Calidad de compresión (1-100)
+   - CONCURRENCY: 6            → Archivos procesados en paralelo
+   - BG: "#FFFFFF"             → Color de fondo para transparencias
+   - KEEP_EXIF: false          → Conservar datos EXIF/ICC
+   - SKIP_JPEG: false          → Copiar sin re-encode si ya es JPG
+   - DRY_RUN: false            → Modo simulación
+   - VERBOSE: true             → Logs detallados
+   - RESUME: true              → Reanudar si hay error
+   - CHECKPOINT_EVERY: 25      → Guardar estado cada N archivos
+   - SUMMARY_MAX_ERRORS: 200   → Límite de errores a mostrar
+
+2. PROCESO:
+   a) Lee todos los archivos de ./img/ (incluyendo subcarpetas)
+   b) Filtra solo imágenes soportadas
+   c) Procesa en paralelo (máximo 6 simultáneos por defecto)
+   d) Convierte a JPG con configuración especificada
+   e) Guarda en ./jpgs/ manteniendo estructura de carpetas
+   f) Guarda checkpoints cada 25 archivos
+   g) Genera resumen final con estadísticas
+
+3. REANUDACIÓN:
+   Si el script se interrumpe, la próxima ejecución detecta el archivo
+   .convert-jpg-state.json y continúa desde donde paró.
+
+================================================================================
+ARCHIVOS DE SALIDA EN ./jpgs/:
+================================================================================
+
+✅ ARCHIVOS GENERADOS AUTOMÁTICAMENTE:
+
+.convert-jpg-state.json
+  └─ Estado interno: qué archivos se procesaron, errores, estadísticas
+     Usado para reanudación automática
+
+.convert-events.jsonl
+  └─ Log JSON (una línea por evento)
+     Formato: {"relPath":"...", "action":"...", "at":"timestamp"}
+
+convert-summary-YYYYMMDD-HHMMSS.txt
+  └─ Resumen legible con:
+     • Total de archivos procesados
+     • Éxitos vs errores
+     • Tiempo total
+     • Lista de errores (hasta 200)
+
+================================================================================
+DEPENDENCIAS (en package.json):
+================================================================================
+
+globby (v15.0.0)
+  └─ Busca archivos recursivamente con patrones glob
+
+p-limit (v7.2.0)
+  └─ Controla concurrencia (procesa 6 archivos máximo en paralelo)
+
+sharp (v0.34.4)
+  └─ Librería de procesamiento de imágenes de alto rendimiento
+
+================================================================================
+FLUJO DE EJECUCIÓN:
+================================================================================
+
+Inicio
+  ↓
+¿Existe .convert-jpg-state.json en ./jpgs/?
+  ├─ Sí → Cargar estado anterior (RESUME)
+  └─ No → Comenzar nuevo proceso
+  ↓
+Buscar imágenes en ./img/ recursivamente
+  ↓
+Filtrar solo formatos soportados
+  ↓
+Procesar en paralelo (máximo CONCURRENCY archivos):
+  ├─ Cada archivo:
+  │   ├─ ¿Es JPEG y SKIP_JPEG=true?
+  │   │   └─ Copiar sin convertir
+  │   └─ Si no:
+  │       ├─ Convertir a JPG (QUALITY especificada)
+  │       ├─ Aplicar fondo si hay transparencia (BG)
+  │       ├─ Guardar en ./jpgs/ (estructura igual a ./img/)
+  │       └─ Registrar en state.json
+  ↓
+¿Cada CHECKPOINT_EVERY archivos?
+  └─ Guardar estado intermedio
+  ↓
+Generar .convert-events.jsonl
+  ↓
+Generar convert-summary-[timestamp].txt
+  ↓
+Fin
+
+================================================================================
+CÓMO USAR:
+================================================================================
+
+1. PREPARAR:
+   • Coloca imágenes en la carpeta ./img/
+   • Las subcarpetas se mantienen en ./jpgs/
+
+2. EDITAR CONFIGURACIÓN (opcional):
+   • Abre convertidor.mjs
+   • Modifica el objeto CONFIG (líneas 6-19)
+   • Guarda cambios
+
+3. EJECUTAR:
+   node convertidor.mjs
+
+4. RESULTADOS:
+   • Espera a que termine (ve el resumen final)
+   • Revisa la carpeta ./jpgs/ para los JPGs convertidos
+   • Consulta convert-summary-[timestamp].txt para detalles
+
+5. REANUDAR SI HAY ERROR:
+   • Vuelve a ejecutar: node convertidor.mjs
+   • Automáticamente continúa desde donde paró
+
+================================================================================
+FORMATOS SOPORTADOS:
+================================================================================
+
+ENTRADA (./img/):
+  • PNG
+  • JPG / JPEG / JFIF
+  • WebP
+  • AVIF
+  • HEIC / HEIF (iPhone)
+  • TIFF
+  • BMP
+  • GIF
+  • SVG
+
+SALIDA (./jpgs/):
+  • JPG (con calidad configurable 1-100)
+
+================================================================================
+EJEMPLO DE ESTRUCTURA:
+================================================================================
+
+ENTRADA (./img/):
+  img/
+  ├── foto1.png
+  ├── documento.pdf (ignorado)
+  └── vacaciones/
+      ├── playa.webp
+      └── montaña.heic
+
+SALIDA (./jpgs/):
+  jpgs/
+  ├── foto1.jpg
+  └── vacaciones/
+      ├── playa.jpg
+      └── montaña.jpg
+
+================================================================================
+NOTAS IMPORTANTES:
+================================================================================
+
+• Los archivos en ./jpgs/ NO se eliminan automáticamente al reiniciar
+• Si reprocesas, usa SKIP_JPEG: true para evitar re-encodear JPGs existentes
+• DRY_RUN: true simula sin escribir archivos (útil para probar)
+• VERBOSE: true muestra logs detallados (desactiva si hay muchos archivos)
+• Los errores se registran pero NO detienen el proceso
+• Máximo 6 archivos en paralelo por defecto (ajusta CONCURRENCY según RAM)
+
+================================================================================
+MODIFICAR CONFIGURACIÓN:
+================================================================================
+
+QUALITY (1-100):
+  • 1-30:   Muy comprimido, calidad baja
+  • 31-60:  Comprimido, calidad media
+  • 61-85:  Buena relación calidad/tamaño (recomendado)
+  • 86-95:  Alta calidad, archivos grandes
+  • 96-100: Máxima calidad, archivos muy grandes
+
+CONCURRENCY (1+):
+  • 1:    Un archivo a la vez (lento pero usa poca RAM)
+  • 6:    Recomendado (balance velocidad/RAM)
+  • 12+:  Solo si tienes máquina potente
+
+BG (color para transparencias):
+  • "#FFFFFF"  → Fondo blanco (defecto)
+  • "#000000"  → Fondo negro
+  • "#FF0000"  → Fondo rojo
+  etc.
+
+================================================================================
+FIN
+================================================================================
